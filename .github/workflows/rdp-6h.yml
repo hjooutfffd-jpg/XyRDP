@@ -1,4 +1,4 @@
-name: RdpFree — RDP Cloudflare 6 Jam
+name: RdpFree — RDP Cloudflare Fixed
 
 on:
   workflow_dispatch:
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   rdp:
-    name: Sesi RDP (Cloudflare Tunnel)
+    name: Sesi RDP (Cloudflare Fixed)
     runs-on: windows-2022
     timeout-minutes: 360
     env:
@@ -50,19 +50,22 @@ jobs:
         continue-on-error: true
         run: ./scripts/restore-state.ps1
 
-      - name: Setup Cloudflare Tunnel (RDP over TCP/Cloudflared)
+      - name: Fix Cloudflare Tunnel & Start
         shell: pwsh
         run: |
-          Write-Host "Mengunduh Cloudflare Tunnel..."
+          Write-Host "تحميل أداة Cloudflare..."
           $cfUrl = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
           Invoke-WebRequest -Uri $cfUrl -OutFile "C:\Windows\cloudflared.exe"
           
-          Write-Host "Menjalankan Cloudflare Tunnel ke port RDP (3389)..."
+          Write-Host "تعديل صلاحيات منفذ RDP لكي تقبله أداة Cloudflare..."
+          # السماح لخدمة الشبكة بالوصول للمنفذ بدون قيود صعبة
+          netsh advfirewall firewall set rule name="Remote Desktop - User Mode (TCP-In)" new enable=yes >$null 2>&1
+          
+          Write-Host "تشغيل Cloudflare Tunnel..."
           Start-Process -FilePath "C:\Windows\cloudflared.exe" -ArgumentList "access tcp --hostname rdp-$env:GITHUB_RUN_ID.trycloudflare.com --url localhost:3389" -NoNewWindow
           
-          # طباعة رابط الاتصال المؤقت في اللوج
           Write-Host "===================================================="
-          Write-Host "RDP Cloudflare Hostname: rdp-$env:GITHUB_RUN_ID.trycloudflare.com"
+          Write-Host "رابط الاتصال الجديد: rdp-$env:GITHUB_RUN_ID.trycloudflare.com"
           Write-Host "===================================================="
 
       - name: Jaga sesi tetap hidup (keepalive)
@@ -126,3 +129,4 @@ jobs:
                 -Headers $hdr -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 20 | Out-Null
             }
           } catch {}
+          
