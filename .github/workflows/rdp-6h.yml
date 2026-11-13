@@ -1,4 +1,4 @@
-name: RdpFree — RDP Cloudflare Fixed
+name: RdpFree — RDP Cloudflare Fixed V2
 
 on:
   workflow_dispatch:
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   rdp:
-    name: Sesi RDP (Cloudflare Fixed)
+    name: Sesi RDP (Cloudflare Port Fix)
     runs-on: windows-2022
     timeout-minutes: 360
     env:
@@ -50,19 +50,20 @@ jobs:
         continue-on-error: true
         run: ./scripts/restore-state.ps1
 
-      - name: Fix Cloudflare Tunnel & Start
+      - name: Fix Cloudflare Port & Start
         shell: pwsh
         run: |
           Write-Host "تحميل أداة Cloudflare..."
           $cfUrl = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
           Invoke-WebRequest -Uri $cfUrl -OutFile "C:\Windows\cloudflared.exe"
           
-          Write-Host "تعديل صلاحيات منفذ RDP لكي تقبله أداة Cloudflare..."
-          # السماح لخدمة الشبكة بالوصول للمنفذ بدون قيود صعبة
-          netsh advfirewall firewall set rule name="Remote Desktop - User Mode (TCP-In)" new enable=yes >$null 2>&1
+          Write-Host "تغيير منفذ استماع RDP الداخلي إلى 3390 لتجنب التعارض..."
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "PortNumber" -Value 3390
+          Stop-Service TermService -Force
+          Start-Service TermService
           
-          Write-Host "تشغيل Cloudflare Tunnel..."
-          Start-Process -FilePath "C:\Windows\cloudflared.exe" -ArgumentList "access tcp --hostname rdp-$env:GITHUB_RUN_ID.trycloudflare.com --url localhost:3389" -NoNewWindow
+          Write-Host "تشغيل Cloudflare Tunnel على المنفذ 3390..."
+          Start-Process -FilePath "C:\Windows\cloudflared.exe" -ArgumentList "access tcp --hostname rdp-$env:GITHUB_RUN_ID.trycloudflare.com --url localhost:3390" -NoNewWindow
           
           Write-Host "===================================================="
           Write-Host "رابط الاتصال الجديد: rdp-$env:GITHUB_RUN_ID.trycloudflare.com"
@@ -129,4 +130,3 @@ jobs:
                 -Headers $hdr -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 20 | Out-Null
             }
           } catch {}
-          
