@@ -1,4 +1,4 @@
-name: RdpFree — RDP Basic 6 Jam
+name: RdpFree — RDP Cloudflare 6 Jam
 
 on:
   workflow_dispatch:
@@ -27,14 +27,13 @@ concurrency:
 
 jobs:
   rdp:
-    name: Sesi RDP (Windows 2022)
+    name: Sesi RDP (Cloudflare Tunnel)
     runs-on: windows-2022
     timeout-minutes: 360
     env:
       DUR: ${{ inputs.durasi_menit || '360' }}
       RDP_USER: xyadmin
       RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
-      TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
       PERPANJANG_OTOMATIS: ${{ inputs.perpanjang_otomatis || 'ya' }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -51,9 +50,20 @@ jobs:
         continue-on-error: true
         run: ./scripts/restore-state.ps1
 
-      - name: Setup akses Tailscale
+      - name: Setup Cloudflare Tunnel (RDP over TCP/Cloudflared)
         shell: pwsh
-        run: ./scripts/setup-akses.ps1
+        run: |
+          Write-Host "Mengunduh Cloudflare Tunnel..."
+          $cfUrl = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+          Invoke-WebRequest -Uri $cfUrl -OutFile "C:\Windows\cloudflared.exe"
+          
+          Write-Host "Menjalankan Cloudflare Tunnel ke port RDP (3389)..."
+          Start-Process -FilePath "C:\Windows\cloudflared.exe" -ArgumentList "access tcp --hostname rdp-$env:GITHUB_RUN_ID.trycloudflare.com --url localhost:3389" -NoNewWindow
+          
+          # طباعة رابط الاتصال المؤقت في اللوج
+          Write-Host "===================================================="
+          Write-Host "RDP Cloudflare Hostname: rdp-$env:GITHUB_RUN_ID.trycloudflare.com"
+          Write-Host "===================================================="
 
       - name: Jaga sesi tetap hidup (keepalive)
         shell: pwsh
@@ -116,4 +126,3 @@ jobs:
                 -Headers $hdr -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 20 | Out-Null
             }
           } catch {}
-          
