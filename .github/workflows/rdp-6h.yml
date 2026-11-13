@@ -1,4 +1,4 @@
-name: RdpFree — RDP Optimized for Games (Tailscale)
+name: RdpFree — RDP Basic 6 Jam
 
 on:
   workflow_dispatch:
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   rdp:
-    name: Sesi RDP (Optimized Setup)
+    name: Sesi RDP (Windows 2022)
     runs-on: windows-2022
     timeout-minutes: 360
     env:
@@ -50,27 +50,6 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: ./scripts/restore-state.ps1
-
-      - name: Optimasi CPU & Performa Maksimal
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          Write-Host "تفعيل أقصى أداء للمعالج (High Performance)..."
-          powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
-          
-          Write-Host "تحسين الذاكرة الافتراضية (Virtual Memory / Pagefile)..."
-          $sysDrive = Get-WmiObject Win32_ComputerSystem
-          $sysDrive.AutomaticManagedPagefile = $False
-          $sysDrive.Put()
-          $pagefile = Get-WmiObject Win32_PageFileSetting -Filter "Name='C:\\pagefile.sys'"
-          if ($pagefile) {
-            $pagefile.InitialSize = 8192
-            $pagefile.MaximumSize = 16384
-            $pagefile.Put()
-          } else {
-            Set-CimInstance -Query "Select * from Win32_ComputerSystem" -Property @{AutomaticManagedPagefile=$false}
-            New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name="C:\pagefile.sys"; InitialSize = 8192; MaximumSize = 16384}
-          }
 
       - name: Setup akses Tailscale
         shell: pwsh
@@ -137,4 +116,3 @@ jobs:
                 -Headers $hdr -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 20 | Out-Null
             }
           } catch {}
-          
