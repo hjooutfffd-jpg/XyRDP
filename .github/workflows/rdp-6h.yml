@@ -1,4 +1,4 @@
-name: RdpFree — RDP Cloudflare Fixed V2
+name: RdpFree — RDP Optimized for Games (Tailscale)
 
 on:
   workflow_dispatch:
@@ -27,13 +27,14 @@ concurrency:
 
 jobs:
   rdp:
-    name: Sesi RDP (Cloudflare Port Fix)
+    name: Sesi RDP (Optimized Setup)
     runs-on: windows-2022
     timeout-minutes: 360
     env:
       DUR: ${{ inputs.durasi_menit || '360' }}
       RDP_USER: xyadmin
       RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+      TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
       PERPANJANG_OTOMATIS: ${{ inputs.perpanjang_otomatis || 'ya' }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -50,24 +51,30 @@ jobs:
         continue-on-error: true
         run: ./scripts/restore-state.ps1
 
-      - name: Fix Cloudflare Port & Start
+      - name: Optimasi CPU & Performa Maksimal
         shell: pwsh
+        continue-on-error: true
         run: |
-          Write-Host "تحميل أداة Cloudflare..."
-          $cfUrl = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
-          Invoke-WebRequest -Uri $cfUrl -OutFile "C:\Windows\cloudflared.exe"
+          Write-Host "تفعيل أقصى أداء للمعالج (High Performance)..."
+          powercfg -setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
           
-          Write-Host "تغيير منفذ استماع RDP الداخلي إلى 3390 لتجنب التعارض..."
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "PortNumber" -Value 3390
-          Stop-Service TermService -Force
-          Start-Service TermService
-          
-          Write-Host "تشغيل Cloudflare Tunnel على المنفذ 3390..."
-          Start-Process -FilePath "C:\Windows\cloudflared.exe" -ArgumentList "access tcp --hostname rdp-$env:GITHUB_RUN_ID.trycloudflare.com --url localhost:3390" -NoNewWindow
-          
-          Write-Host "===================================================="
-          Write-Host "رابط الاتصال الجديد: rdp-$env:GITHUB_RUN_ID.trycloudflare.com"
-          Write-Host "===================================================="
+          Write-Host "تحسين الذاكرة الافتراضية (Virtual Memory / Pagefile)..."
+          $sysDrive = Get-WmiObject Win32_ComputerSystem
+          $sysDrive.AutomaticManagedPagefile = $False
+          $sysDrive.Put()
+          $pagefile = Get-WmiObject Win32_PageFileSetting -Filter "Name='C:\\pagefile.sys'"
+          if ($pagefile) {
+            $pagefile.InitialSize = 8192
+            $pagefile.MaximumSize = 16384
+            $pagefile.Put()
+          } else {
+            Set-CimInstance -Query "Select * from Win32_ComputerSystem" -Property @{AutomaticManagedPagefile=$false}
+            New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name="C:\pagefile.sys"; InitialSize = 8192; MaximumSize = 16384}
+          }
+
+      - name: Setup akses Tailscale
+        shell: pwsh
+        run: ./scripts/setup-akses.ps1
 
       - name: Jaga sesi tetap hidup (keepalive)
         shell: pwsh
@@ -130,3 +137,4 @@ jobs:
                 -Headers $hdr -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 20 | Out-Null
             }
           } catch {}
+          
